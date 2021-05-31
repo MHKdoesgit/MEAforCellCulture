@@ -2,10 +2,10 @@
 
 
 function testanalyzedrandomelectricpulses()
-exp1 = load('I:\MEA\20200903_pulsematlabsript_wtcells\exp1_chamb1\h5\electrical_stimuli\02_electricPulseStimulus_30.0repeats_at0.50Hz_electrical_stimuli.mat');
-dum1 = load('I:\MEA\20200903_pulsematlabsript_dummy\exp1_chamb1_dummy\h5\electrical_stimuli\02_electricPulseStimulus_30.0repeats_at0.50Hz_electrical_stimuli.mat');
+exp1 = load('E:\MEA\20200903_pulsematlabsript_wtcells\exp1_chamb1\h5\electrical_stimuli\02_electricPulseStimulus_30.0repeats_at0.50Hz_electrical_stimuli.mat');
+dum1 = load('E:\MEA\20200903_pulsematlabsript_dummy\exp1_chamb1_dummy\h5\electrical_stimuli\02_electricPulseStimulus_30.0repeats_at0.50Hz_electrical_stimuli.mat');
 
-ogstim  = load('I:\MEA\Electrical Stimulus\electricPulseStimulus_30.0repeats_at0.50Hz.mat'); 
+ogstim  = load('E:\MEA\Electrical Stimulus\electricPulseStimulus_30.0repeats_at0.50Hz.mat'); 
 
 
 %ogstim
@@ -39,12 +39,17 @@ for ii = 1:numcombs
 end
 
 
-for n = 1:28; cla; plot(el{32,n}','r'); hold on; plot(eldum{32,n}','k'); title(n); pause; end
+for n = 1:28; cla;
+    plot(el{32,n}','r'); 
+    hold on;
+    %plot(eldum{32,n}','k');
+    title(n); pause; 
+end
 
 col = hsv(numcombs);
 for n = 1:numcombs
    subplot_tight(4,7,n)
-   plot(el{33,n}','color',col(n,:)); 
+   plot(eldum{33,n}','color',col(n,:)); 
 end
 
 end

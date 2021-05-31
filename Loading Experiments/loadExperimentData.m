@@ -66,7 +66,7 @@ if not(exist(h5path,'dir'))
 end
 
 % this part is to load correct rasters files
-if not(exist([kspath,filesep,'ksrasters'],'dir')) 
+if not(exist([kspath,filesep,'ksrasters',filesep,'ksrasters.mat'],'file')) 
     ksdata = readKilosortData(kspath);
 else
     ksdata = load([kspath,filesep,'ksrasters',filesep,'ksrasters.mat']);   
@@ -104,7 +104,7 @@ for ii  = 1: numel(stimulinames)
     thisExp.spiketimes              =   ksdata.spike_times(clusidx,ii);
     temptemp                        =   ksdata.template_info(clusidx);
     thisExp.templates               =   {temptemp.templates}';
-    [thisExp.electricalstimulus, ~, ~, h5path] = electricStimulusTimeStamps(datapath, stimulinames{ii});
+    [thisExp.electricalstimulus, thisExp.pulseinfo, h5path, electinfopath] = electricStimulusTimeStamps(datapath, stimulinames{ii});
     
     if isempty(thisExp.electricalstimulus)
         thisExp = rmfield( thisExp, 'electricalstimulus');
@@ -118,13 +118,14 @@ for ii  = 1: numel(stimulinames)
     thisExp.stim_start_end          =   ksdata.sort_params.stim_start_end;
     thisExp.samplingrate            =   ksdata.sort_params.sampling_rate;
     thisExp.h5path                  =   h5path;
+    thisExp.electstimpath           =   electinfopath; 
     thisExp.date                    =   expSharedInfo.date;
     
     experiment = thisExp;
     save([datapath,'/Data Analysis/Raw Data/',stimulinames{ii},' for experiment on ',thisExp.date,'.mat'],'-v7.3','-struct','thisExp');
     
     fprintf(['pre-analyzing stimulus ',stimulinames{ii}, '...is finito, took... %.1f sec\n'],toc);
-    clearvars thisExp experiment;
+    clearvars thisExp ;
 end
 
 end

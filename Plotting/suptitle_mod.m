@@ -66,19 +66,19 @@ max_y=0;
 min_y=1;
 
 oldtitle =0;
-for i=1:length(h),
-    if (~strcmp(get(h(i),'Tag'),'suptitle')),
+for i=1:length(h)
+    if (~strcmp(get(h(i),'Tag'),'suptitle'))
         pos=get(h(i),'pos');
-        if (pos(2) < min_y), min_y=pos(2)-ff/5*3;end;
-        if (pos(4)+pos(2) > max_y), max_y=pos(4)+pos(2)+ff/5*2;end;
+        if (pos(2) < min_y), min_y=pos(2)-ff/5*3;end
+        if (pos(4)+pos(2) > max_y), max_y=pos(4)+pos(2)+ff/5*2;end
     else
         oldtitle = h(i);
     end
 end
 
-if max_y > plotregion,
+if max_y > plotregion
     scale = (plotregion-min_y)/(max_y-min_y);
-    for i=1:length(h),
+    for i=1:length(h)
         pos = get(h(i),'position');
         pos(2) = (pos(2)-min_y)*scale+min_y;
         pos(4) = pos(4)*scale-(1-scale)*ff/5*3;
@@ -88,7 +88,7 @@ end
 
 np = get(currentfig,'nextplot');
 set(currentfig,'nextplot','add');
-if (oldtitle),
+if (oldtitle)
     delete(oldtitle);
 end
 ha = axes('pos',[0 1 1 1],'visible','off','Tag','suptitle');

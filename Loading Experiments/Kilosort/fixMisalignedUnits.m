@@ -12,6 +12,7 @@ function [spktimes, avgtemps, misalUnitIds] = fixMisalignedUnits(spktimes, spkcl
 %==========================================================================
 [Ntemps, Nt, Nyx] = size(temps);
 Nunits = max(spkclusts);
+temps (isnan(temps(:))) = 0; % why the values come as NaN from KS
 %==========================================================================
 % get average templates
 templateMat = accumarray([spkclusts spktemps+1], 1, [Nunits Ntemps]);

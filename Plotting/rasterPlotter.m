@@ -32,7 +32,8 @@ function varargout = rasterPlotter(spikes,varargin)
 
 if (nargin > 1 && isnumeric(varargin{1})), spikes_height = varargin{1};  else, spikes_height = 0.4;  end
 if nargin > 2, plot_color = varargin{2};  else, plot_color = [0 0.7461 1]; end
-if nargin > 3, plot_linwidth = varargin{3};  else, plot_linwidth = 1;  end
+if nargin > 3, y_offset = varargin{3}-1;  else, y_offset = 0;  end
+if nargin > 4, plot_linwidth = varargin{3};  else, plot_linwidth = 1;  end
 
 % if size(spikes,1) > size(spikes,2)
 %      spikes = transpose(spikes);
@@ -59,10 +60,10 @@ spkoneline = [spikes(:),spikes(:),nan(numel(spikes(:)),1)]';
 tboneline = [spkbp(:),spktp(:), nan(numel(spktp(:)),1)]';
 
 try   % small trick to make it more flexiable to user inputs
-    rasplt = line(spkoneline(:),tboneline(:),'color',plot_color,'linewidth',plot_linwidth);
+    rasplt = line(spkoneline(:),tboneline(:) + y_offset,'color',plot_color,'linewidth',plot_linwidth);
 catch ME 
     disp(ME.message)
-    rasplt = plot(spkoneline(:),tboneline(:),varargin{:});
+    rasplt = plot(spkoneline(:),tboneline(:) + y_offset,varargin{:});
 end
 
 hold off;

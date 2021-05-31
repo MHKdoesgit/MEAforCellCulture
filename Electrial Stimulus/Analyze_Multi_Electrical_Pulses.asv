@@ -1,0 +1,314 @@
+
+function varargout = Analyze_Multi_Electrical_Pulses(datapath, varargin)
+
+totaltime =tic;
+if (nargin < 1),    datapath = uigetdir();  end
+
+
+rawdatpath = [datapath, filesep, 'Data Analysis/Raw Data', filesep];
+stimlist = dir( [rawdatpath, '*cathodic-anodicpulse*.mat']);
+stimlist = {stimlist.name}';
+stimnums = str2double(extractBefore(stimlist,'_cath'));
+
+stimdat = cell(size(stimlist));
+for ii = 1: numel(stimlist)
+    stimdat{ii} = load([rawdatpath, filesep, stimlist{ii}]);
+end
+stimdat = cell2mat(stimdat);
+[rasterspsth, rasterspsthperpulse, burstactivity] = deal(cell(size(stimlist)));
+
+mstosubfromft = 50/1e3;
+recordingdur = diff(stimdat(1).stim_start_end,1,2) ./ stimdat(1).samplingrate;
+recordingdur = recordingdur(stimnums);
+
+for ii = 1: numel(stimlist)
+    
+    thisExp = stimdat(ii);
+    
+    burstactivity{ii} = burst_analysis(thisExp.spiketimes,recordingdur(ii));
+    
+    ft = thisExp.electricalstimulus.pulsedetectedat ./ thisExp.electricalstimulus.ops.fs;
+    ftmcs = thisExp.pulseinfo.single_pulse_start';
+    if length(ftmcs) ~= length(ft)
+        stimlendiff = num2str(length(ftmcs) - length(ft));
+        warning(['Mis-match number of detected pulses (',stimlendiff,' pulse for stim id: ',num2str(ii),')']);
+        if stimlendiff < 0
+            [ft,ftidx] = findClosestValue(ft,ftmcs);
+            stimdat(ii).electricalstimulus.mean2subtract = stimdat(ii).electricalstimulus.mean2subtract(ftidx,:,:);
+             stimdat(ii).electricalstimulus.pulsedetectedat = stimdat(ii).electricalstimulus.pulsedetectedat(ftidx);
+            stimdat(ii).electricalstimulus.pulseindices = stimdat(ii).electricalstimulus.pulseindices(ftidx,:);
+            stimdat(ii).electricalstimulus.pulsestartstop = stimdat(ii).electricalstimulus.pulsestartstop(ftidx,:);
+            
+        else
+            ft = ftmcs;
+        end
+    end
+    ft = ft - mstosubfromft; % few milisecond to subtract from onset of stimulus
+    
+    rasterspsth{ii} = getRastersandPSTH(ft, thisExp.spiketimes);
+    
+    rasterspsthperpulse{ii} = raspsthperpulse(ft,thisExp.spiketimes);
+    
+    [interpulsebursts,~,ipbidx] = histcounts(burstactivity{ii}.burstpeaktime,ft);
+    time2peak = zeros(size(interpulsebursts));
+    for jj = 1:numel(ft)
+        bi = find(ipbidx == jj);
+        if ~isempty(bi)
+            time2peak(jj) = (burstactivity{ii}.burstpeaktime(bi(1)) - ft(jj));
+        end
+        
+    end
+    burstactivity{ii}.interpulsebursts = interpulsebursts;
+    burstactivity{ii}.pulsetime2peak = time2peak;
+    
+    rasterspsthperpulse{ii}.interpulsebursts = interpulsebursts;
+    rasterspsthperpulse{ii}.pulsetime2peak = time2peak;
+    rasterspsthperpulse{ii}.pulseburstindex = ipbidx;
+    rasterspsthperpulse{ii}.electstimtime = ft;
+    rasterspsthperpulse{ii}.allrasters  = burstactivity{ii}.rastersall;
+    rasterspsthperpulse{ii}.burstyrastes = burstactivity{ii}.rastersbursty;
+    rasterspsthperpulse{ii}.allpsth = burstactivity{ii}.psthall;
+    rasterspsthperpulse{ii}.burstypsth = burstactivity{ii}.psth;
+    rasterspsthperpulse{ii}.allpsthtime = burstactivity{ii}.psthtime;
+    rasterspsthperpulse{ii}.burstycellindex = burstactivity{ii}.burstycellindex;
+    rasterspsthperpulse{ii}.esstim = thisExp.electricalstimulus;
+    rasterspsthperpulse{ii}.recordingdur = recordingdur(ii);
+    
+    % later for synchrony analysis
+    %ccdata = calcCCG(thisExp.spiketimes, 0.5/1e3, 200);
+    
+    amps = stimdat(ii).amplitudes;
+    burstactivity{ii}.amplitudes = amps(burstactivity{ii}.burstycellindex);
+    burstactivity{ii}.allChansAmplitudes = amps;
+    burstactivity{ii}.indices.meanAmplitudes = cellfun(@mean,amps(burstactivity{ii}.burstycellindex));
+    burstactivity{ii}.indices.allChansMeanAmplitudes = cellfun(@mean,amps);
+    burstactivity{ii}.spiketimes = stimdat(ii).spiketimes(burstactivity{ii}.burstycellindex);
+    
+    %rasterspsthperpulse{ii}.amps = stimdat(ii).amplitudes;
+    
+end
+rasterspsth = cell2mat(rasterspsth);
+rasterspsthperpulse = cell2mat(rasterspsthperpulse);
+burstactivity = cell2mat(burstactivity);
+
+esdata = psthpeaklatdecay(rasterspsth);
+
+
+savingpath = [datapath, filesep, 'Data Analysis',filesep,'Electrical_Stimuluation_Effects_Analysis'];
+if ~exist(savingpath,'dir'), mkdir(savingpath); end
+
+filename = ['Effect of electrical stimulation for experiment on ', stimdat(1).date];
+save([savingpath,'\',filename,'.mat'],'-v7.3','rasterspsthperpulse');
+plot_Multi_Electrical_Pulses(stimdat, rasterspsthperpulse, 3, savingpath);
+
+
+savingpath = [datapath, filesep, 'Data Analysis',filesep,'Cell_Responses_to_Electric_Pulse_Analysis'];
+if ~exist(savingpath,'dir'), mkdir(savingpath); end
+
+filename = ['Cell responses to electrical stimulation for experiment on ', stimdat(1).date];
+save([savingpath,'\',filename,'.mat'],'-v7.3','burstactivity');
+plot_Multi_Electrical_Pulses(stimdat, esdata, 2, savingpath);
+
+
+savingpath = [datapath, filesep, 'Data Analysis',filesep,'Electric_Pulse_Burst_Analysis'];
+if ~exist(savingpath,'dir'), mkdir(savingpath); end
+
+filename = ['Electric-pulse burst analysis for experiment on ', stimdat(1).date];
+save([savingpath,'\',filename,'.mat'],'-v7.3','burstactivity');
+
+plot_Multi_Electrical_Pulses(stimdat, burstactivity,1,savingpath);
+
+sound(struct2array(load('chirp.mat','y')));
+disp(seconds2human (toc(totaltime)));
+varargout{1} = burstactivity;
+varargout{2} = esdata;
+varargout{3} = rasterspsthperpulse;
+
+end
+
+
+%--------------------------------------------------------------------------------------------------%
+%----------                               sub-functions                                  ----------%
+%--------------------------------------------------------------------------------------------------%
+
+function out = getRastersandPSTH(ft,spk, varargin)
+
+% stim = ft(1:steps:numel(ft));
+binLength = 10/1e3;
+stimround = round(mean(diff(ft)),2); % one --|'|--|_| is 5000 ms, 4 frame change
+binVec = linspace(0,stimround,1+stimround/binLength);
+
+tbefore = 2;
+binvecbefore = linspace(0,tbefore,1+tbefore/binLength);
+[rasters, rastersbefore] = deal (cell(numel(spk),1));
+psth = zeros(numel(spk), length(binVec));
+psthbefore = zeros(numel(spk), length(binvecbefore));
+
+for ii = 1: numel(spk)
+    
+    [rasTrials, rasbefore] = deal (cell((length(ft)-1),1));
+    eachcellspk = spk{ii};
+    
+    for jj = 1:numel(ft)-1 %first trial is background intensity
+        rasTrials{jj} = eachcellspk(and(eachcellspk > ft(jj),eachcellspk <= ft(jj+1))) - ft(jj);
+        rasbefore{jj} = eachcellspk(and(eachcellspk > ft(jj)-tbefore,eachcellspk <= ft(jj+1)-tbefore)) - (ft(jj)-tbefore);
+        if isempty(rasTrials{jj}); rasTrials{jj} = NaN; end
+    end
+    rasters{ii} = CelltoMatUE(rasTrials);
+    rastersbefore{ii} = CelltoMatUE(rasbefore);
+    
+    if size(rasters{ii},2) < 2
+        try
+            psth(ii,:) = (histc(rasters{ii}',binVec)/size(rasters{ii},1))*(1/binLength);  %#ok to fix situation with 1 spike
+        catch
+            psth(ii,:) = mean(histc(rasters{ii}',binVec),2)*(1/binLength);   %#ok
+        end
+    else
+        psth(ii,:) = mean(histc(rasters{ii}',binVec),2)*(1/binLength);   %#ok must transpose contspk for histc to work properly.
+    end
+    
+    
+    if size(rastersbefore{ii},2) < 2
+        try
+            psthbefore(ii,:) = (histc(rastersbefore{ii}',binvecbefore)/size(rastersbefore{ii},1))*(1/binLength);  %#ok to fix situation with 1 spike
+        catch
+            psthbefore(ii,:) = mean(histc(rastersbefore{ii}',binvecbefore),2)*(1/binLength);      %#ok
+        end
+    else
+        psthbefore(ii,:) = mean(histc(rastersbefore{ii}',binvecbefore),2)*(1/binLength);   %#ok must transpose contspk for histc to work properly.
+    end
+    
+end
+
+out.rasters = rasters;
+out.rastersbefore = rastersbefore;
+out.psth = psth(:,1:end-1);
+out.psthbefore = psthbefore(:,1:end-1);
+out.psthtime = binVec(1:end-1);
+out.psthbeforetime = binvecbefore(1:end-1);
+out.binlength = binLength;
+out.timebeforespk = tbefore;
+out.stimdur = stimround;
+
+end
+
+function esdata = psthpeaklatdecay(rpdata)
+
+numpulses = size (rpdata,1);
+numcells = size(rpdata(1).psth,1);
+stimdur = 500;
+disp('Calcualting peak latency, peak value and decay time...');
+tic;
+[lat, beflat, psthpeaks, befpeaks, psthdecaytime, befdecaytime] = deal(nan(numcells,numpulses));
+[decayprop, befdecayprop] = deal(cell(numcells,2));
+
+[rasall, rasallbef] = deal(cell(numcells, numpulses));
+psthall = nan(numcells, size(rpdata(1).psth,2),numpulses);
+psthbefore = nan(numcells, size(rpdata(1).psthbefore,2),numpulses);
+warning('off');
+for ii = 1: numpulses
+    
+    rpd = rpdata(ii);
+    [lat(:,ii), psthpeaks(:,ii)] = psthPeakLatency(rpd.psth',[5 300],10, stimdur);
+    [beflat(:,ii), befpeaks(:,ii)] = psthPeakLatency(rpd.psthbefore',[5 300],10, stimdur);
+    
+    [psthdecaytime(:,ii), dcval,dctvec] = psthDecayTime(rpd.psth', lat(:,ii), stimdur);
+    
+    [befdecaytime(:,ii), befdcval,befdctvec] = psthDecayTime(rpd.psthbefore', beflat(:,ii), stimdur);
+    
+    decayprop{ii,1} = CelltoMatUE(dctvec);
+    decayprop{ii,2} = CelltoMatUE(dcval);
+    
+    befdecayprop{ii,1} = CelltoMatUE(befdctvec);
+    befdecayprop{ii,2} = CelltoMatUE(befdcval);
+    
+    
+    rasall(:,ii) = rpd.rasters;
+    rasallbef(:,ii) = rpd.rastersbefore;
+    psthall(:,:,ii) = rpd.psth;
+    psthbefore(:,:,ii) = rpd.psthbefore;
+    
+end
+warning('on');
+
+esdata.rasters = rasall;
+esdata.beforerasters = rasallbef;
+esdata.psth = psthall;
+esdata.beforepsth = psthbefore;
+esdata.psthtime = rpd.psthtime;
+esdata.beforepsthtime = rpd.psthbeforetime;
+esdata.latency = lat;
+esdata.peak = psthpeaks;
+esdata.decaytime = psthdecaytime;
+esdata.decayprop = decayprop;
+esdata.before.latency = beflat;
+esdata.before.peak = befpeaks;
+esdata.before.decaytime = befdecaytime;
+esdata.before.decayprop = befdecayprop;
+esdata.binlength = rpd.binlength;
+esdata.timebeforespk = rpd.timebeforespk;
+esdata.stimdur = rpd.stimdur;
+
+end
+
+function out = raspsthperpulse(ft, spk)
+
+% stim = ft(1:steps:numel(ft));
+binLength = 25/1e3;
+stimround = round(mean(diff(ft)),2); % one --|'|--|_| is 5000 ms, 4 frame change
+binVec = linspace(0,stimround,1+stimround/binLength);
+
+npulses = numel(ft);
+ncells = numel(spk);
+
+tbefore = 2;
+%binvecbefore = linspace(0,tbefore,1+tbefore/binLength);
+rasters = cell(npulses,1);
+psth = zeros(npulses, length(binVec));
+% psthbefore = zeros(numel(spk), length(binvecbefore));
+
+ft= [ft(1:end);ft(end)+stimround];
+
+
+for ii = 1: npulses
+    ras = cell(1,ncells);
+    for jj = 1: ncells
+        ras{jj} = spk{jj}(spk{jj} > ft(ii) & spk{jj} <= ft(ii+1)) - ft(ii);
+    end
+    rasters{ii} = CelltoMatUE(ras);
+    
+    if size(rasters{ii},2) < 2
+        try
+            psth(ii,:) = (histc(rasters{ii}',binVec)/size(rasters{ii},1))*(1/binLength);  %#ok to fix situation with 1 spike
+        catch
+            psth(ii,:) = mean(histc(rasters{ii}',binVec),2)*(1/binLength);   %#ok
+        end
+    else
+        psth(ii,:) = mean(histc(rasters{ii}',binVec),2)*(1/binLength);   %#ok must transpose contspk for histc to work properly.
+    end
+end
+
+
+out.rasters = rasters;
+%out.rastersbefore = rastersbefore;
+out.psth = psth(:,1:end-1);
+%out.psthbefore = psthbefore(:,1:end-1);
+out.psthtime = binVec(1:end-1);
+%out.psthbeforetime = binvecbefore(1:end-1);
+out.binlength = binLength;
+out.timebeforespk = tbefore;
+out.stimdur = stimround;
+
+
+% for ii = 1:npulses
+%     clf;
+%    subplot(2,1,1)
+%    rasterPlotter(rasters{ii},[],'k');       title(['pulse id:',num2str(ii)]);
+%    subplot(2,1,2)
+%    plot(binVec, psth(ii,:),'r','linewidth',2);
+%    pause;
+% end
+
+
+end
+

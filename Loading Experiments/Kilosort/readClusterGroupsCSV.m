@@ -39,13 +39,21 @@ for ii = 1: numel(headerseq) % fix this later
         switch lower(C{ii}{1})
             case {'quality','qual','q'}
                 phyclusinfo(emptyIndex) = {max(cell2mat(phyclusinfo))+1};
+                phyclusinfo = single(cell2mat(phyclusinfo));
             case {'ch', 'channel'}
                 phyclusinfo = cellfun(@(x)x+1,phyclusinfo,'un',0); % add 1 to match indexing from MATLAB
+                phyclusinfo = single(cell2mat(phyclusinfo));
+            case {'comment'}
+                commentslist = C{ii}(2:end);
+                commentslist(cellfun('isempty',commentslist)) = {''};
+                phyclusinfo = commentslist;
             otherwise
                 phyclusinfo(emptyIndex) = {NaN};
+                phyclusinfo = single(cell2mat(phyclusinfo));
         end
-        phyclusinfo = single(cell2mat(phyclusinfo));
+        
     end
+    if isempty(phyclusinfo) && iscell(phyclusinfo), phyclusinfo = cell2mat(phyclusinfo); end
     cgs.(C{ii}{1}) =  phyclusinfo;
 end
 
@@ -92,5 +100,5 @@ D = textscan(fid, '%s','Delimiter', '\t');
 fclose(fid);
 n = cellfun(@(x)(~isnan(str2double(x))),D{1});
 headerseq = D{1}(1:find(n,1,'first')-1);
-
+if all(n==0) && isempty(headerseq), headerseq = D{1}; end
 end
